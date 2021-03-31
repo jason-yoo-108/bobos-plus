@@ -6,7 +6,9 @@ This script contains several objective functions implemented for the BO-BOS algo
 '''
 
 from __future__ import print_function
-import tensorflow as tf
+#import tensorflow
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import scipy.io as sio
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -37,8 +39,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
-mnist_path = "datasets/mnist/"
-svhn_path = "datasets/svhn/"
+mnist_path = "datasets/"
+svhn_path = "datasets/"
 
 kappa = 2.0 # the \kappa parameter to be used in the second criteria for early stopping
 

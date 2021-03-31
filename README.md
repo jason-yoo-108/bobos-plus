@@ -1,4 +1,20 @@
-# Bayesian-Optimization-Meets-Bayesian-Optimal-Stopping
+# 540 Project Details
+
+## How to run code on MNIST TLDR
+1. Create a new virtual environment for the project using `venv` or `conda` (optional but recommended)
+2. Install a Fortrain compiler like `gfortran`
+3. `cd` to this directory
+4. Run `pip install -r requirements.txt --no-cache-dir` (replace tensorflow-gpu with tensorflow if your machine doesn't have a gpu)
+5. Download MNIST dataset from [here](https://www.kaggle.com/avnishnish/mnist-original) and unzip to `datasets` directory
+6. Copy the file `dependencies/exp_kern.py` to `<PYTHON PATH>/lib/<PYTHON VERSION>/site-packages/GPy/kern/src`
+7. Copy the contents of the file `dependencies/scipydirect_for_bo_bos.py` and replace the contents of the file `<PYTHON PATH>/lib/<PYTHON VERSION>/site-packages/scipydirect/__init__.py` with the copied contents.
+8. Add the line `from .src.exp_kern import ExpKernel` to `<PYTHON PATH>/lib/<PYTHON VERSION>/site-packages/GPy/kern/__init__.py`
+9. Add the line `from .exp_kern import ExpKernel` to `<PYTHON PATH>/lib/<PYTHON VERSION>/site-packages/GPy/kern/src/__init__.py`
+10. Run the code via `python run_bo_bos.py`
+
+
+# Original README
+
 Code for the following paper:
 
 Zhongxiang Dai, Haibin Yu, Kian Hsiang Low and Patrick Jaillet. "Bayesian Optimization

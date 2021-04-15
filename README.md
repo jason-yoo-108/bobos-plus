@@ -13,6 +13,11 @@
 10. Run the code via `python run_bo_bos.py`
 
 
+## Project Todo
+1. (1 person) Modify the `run_BOS` function at `bos_function.py` by giving the BOS GP an option to accept not just the loss curve but also extra information that comes with the loss. Preprocess the extra information appropriately by scaling etc.
+2. (2 people) Add a function per hyperparameter optimization task at `objective_functions.py`, specifying the hyperparameter tuning range, training logic, evaluation logic, etc.
+
+
 # Original README
 
 Code for the following paper:

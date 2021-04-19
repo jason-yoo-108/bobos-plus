@@ -19,19 +19,19 @@ for run_iter in iterations_list:
     When running the "maximize" function, the intermediate results are saved after every BO iteration, under the file name log_file; the content of the log file is explained in the "analyze_results" ipython notebook script.
     '''
     
-#     run without BOS
-    BO_no_BOS = BayesianOptimization(f=objective_function,
-            dim = 3, gp_opt_schedule=10, \
-            no_BOS=True, use_init=None, \
-            log_file="saved_results/bos_mnist_no_stop_" + str(run_iter) + ".p", save_init=True, \
-            save_init_file="mnist_5_" + str(run_iter) + ".p", \
-            parameter_names=["batch_size", "C", "learning_rate"])
-    # "parameter_names" are dummy variables whose correspondance in the display is not guaranteed
-    BO_no_BOS.maximize(n_iter=50, init_points=3, kappa=2, use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
+    # run without BOS
+    # BO_no_BOS = BayesianOptimization(f=objective_function,
+    #         dim = 3, gp_opt_schedule=10, \
+    #         no_BOS=True, use_init=None, \
+    #         log_file="saved_results/bos_mnist_no_stop_" + str(run_iter) + ".p", save_init=True, \
+    #         save_init_file="mnist_5_" + str(run_iter) + ".p", \
+    #         parameter_names=["batch_size", "C", "learning_rate"])
+    # # "parameter_names" are dummy variables whose correspondance in the display is not guaranteed
+    # BO_no_BOS.maximize(n_iter=50, init_points=3, kappa=2, use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
 
-#     run with BOS, using the same initializations as above
+    # run with BOS, using the same initializations as above
     BO_BOS = BayesianOptimization(f=objective_function,
-            dim = 3, gp_opt_schedule=10, no_BOS=False, use_init="mnist_5_" + str(run_iter) + ".p", \
+            dim = 3, gp_opt_schedule=10, no_BOS=False, use_init=None,#use_init="mnist_5_" + str(run_iter) + ".p", \
             log_file="saved_results/bos_mnist_with_stop_" + str(run_iter) + ".p", save_init=False, \
             save_init_file=None, \
             add_interm_fid=[0, 9, 19, 29, 39], parameter_names=["batch_size", "C", "learning_rate"])

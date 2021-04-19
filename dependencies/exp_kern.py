@@ -9,24 +9,61 @@ class ExpKernel(Kern):
         self.alp = Param("alp", alp)
         self.bet = Param("bet", bet)
         self.link_parameters(self.alp, self.bet)
-    
+
     def K(self,X,X2):
         if X2 is None: X2 = X
         return (self.bet ** self.alp) / (X + X2.T + self.bet) ** self.alp
-    
+
     def Kdiag(self,X):
-        return np.squeeze((self.bet ** self.alp) / (X + X + self.bet) ** self.alp)    
-    
+        return np.squeeze((self.bet ** self.alp) / (X + X + self.bet) ** self.alp)
+
     def parameters_changed(self):
         pass
-    
+
     def update_gradients_full(self, dL_dK, X, X2):
         if X2 is None: X2 = X
-        
+
         denom = (X + X2.T + self.bet) ** self.alp
         d_alp_num = np.log(self.bet) * (self.bet**self.alp) * denom - np.log(X + X2.T + self.bet) * denom * (self.bet**self.alp)
         d_alp_den = denom ** 2
         d_bet_num = self.alp * (self.bet**(self.alp-1)) * denom - self.alp * ((X + X2.T + self.bet)**(self.alp-1)) * (self.bet**self.alp)
+        d_bet_den = denom ** 2
+
+        self.alp.gradient = np.sum((d_alp_num/d_alp_den) * dL_dK)
+        self.bet.gradient = np.sum((d_bet_num/d_bet_den) * dL_dK)
+
+    def update_gradients_diag(self, dL_dKdiag, X):
+        pass
+    def gradients_X(self,dL_dK,X,X2):
+        pass
+    def gradients_X_diag(self,dL_dKdiag,X):
+        pass
+
+
+class MultivariateExpKernel(Kern):
+    def __init__(self,input_dim, alp=1.0, bet=1.0, active_dims=None):
+        super(MultivariateExpKernel, self).__init__(input_dim, active_dims, 'exp kernel')
+        self.alp = Param("alp", alp)
+        self.bet = Param("bet", bet)
+        self.link_parameters(self.alp, self.bet)
+
+    def K(self,X,X2):
+        if X2 is None: X2 = X
+        return (self.bet ** self.alp) / (np.expand_dims(np.sum(X,axis=-1),axis=-1) + np.expand_dims(np.sum(X2.T,axis=-1),axis=-1) + self.bet) ** self.alp
+
+    def Kdiag(self,X):
+        return np.squeeze((self.bet ** self.alp) / (2*(np.sum(X,axis=-1) + self.bet) ** self.alp))
+
+    def parameters_changed(self):
+        pass
+
+    def update_gradients_full(self, dL_dK, X, X2):
+        if X2 is None: X2 = X
+
+        denom = (X + X2.T + self.bet) ** self.alp
+        d_alp_num = np.log(self.bet) * (self.bet**self.alp) * denom - np.log(np.sum(X,axis=-1) + np.sum(X2.T,axis=-1) + self.bet) * denom * (self.bet**self.alp)
+        d_alp_den = denom ** 2
+        d_bet_num = self.alp * (self.bet**(self.alp-1)) * denom - self.alp * ((np.sum(X,axis=-1) + np.sum(X2.T,axis=-1) + self.bet)**(self.alp-1)) * (self.bet**self.alp)
         d_bet_den = denom ** 2
 
         self.alp.gradient = np.sum((d_alp_num/d_alp_den) * dL_dK)

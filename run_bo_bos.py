@@ -4,6 +4,7 @@ import numpy as np
 from bayesian_optimization import BayesianOptimization
 
 ### import the objetive function
+#from objective_functions import MNIST_plus_train_loss as objective_function
 from objective_functions import objective_function_LR_MNIST as objective_function
 # from objective_functions import objective_function_CNN_CIFAR_10 as objective_function
 # from objective_functions import objective_function_CNN_SVHN as objective_function

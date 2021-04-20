@@ -192,12 +192,15 @@ def run_BOS_plus(features, init_curve, incumbent, training_epochs, bo_iteration)
     timestamps = np.arange(1, initial_sample_len+1).reshape(-1, 1)
     features = np.append(features, timestamps, axis=1)
     init_curve = np.array(init_curve).reshape(-1, 1)
-
-    k_exp = GPy.kern.src.MultivariateExpKernel(input_dim=num_features)
+    import pdb; pdb.set_trace()
+    k_exp = GPy.kern.src.MultivariateExpKernel(input_dim=num_features+1)
     m_gpy = GPy.models.GPRegression(features, init_curve, k_exp)
     m_gpy.likelihood.variance.fix(1e-3) # fix the noise, to produce more diverse and realistic forward simulation samples
     m_gpy.optimize(messages=False)
 
+    # TODO: posterior samples need X's that are not just timestamps, but also additional information from BOBOS-PLUS... How to fix?
+    # Solution 1: Also predict future additional information - This would be hard since we need to specify kernel for additional info
+    # Solution 2: Assume the additional information is fixed to the last observed additional information value?
     xx = np.arange(1, initial_sample_len+T+1).reshape(-1, 1)
     post_samples = m_gpy.posterior_samples_f(xx, full_cov=True, size=fs_sample_number)
     post_samples = np.squeeze(post_samples)

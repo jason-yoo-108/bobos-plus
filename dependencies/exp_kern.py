@@ -48,10 +48,15 @@ class MultivariateExpKernel(Kern):
         self.link_parameters(self.alp, self.bet)
 
     def K(self,X,X2):
+        # kernel matrix of shape <num points in X x num points in X2>
         if X2 is None: X2 = X
-        return (self.bet ** self.alp) / (np.expand_dims(np.sum(X,axis=-1),axis=-1) + np.expand_dims(np.sum(X2.T,axis=-1),axis=-1) + self.bet) ** self.alp
+        K, n_dim = 0., X.shape[1]
+        for dim in range(n_dim):
+            K += X[:,dim].reshape(-1,1) + X2[:,dim].reshape(-1,1).T
+        return (self.bet ** self.alp) / (K + self.bet) ** self.alp
 
     def Kdiag(self,X):
+        # diagonals of the kernel matrix K
         return np.squeeze((self.bet ** self.alp) / (2*(np.sum(X,axis=-1) + self.bet) ** self.alp))
 
     def parameters_changed(self):
@@ -60,10 +65,14 @@ class MultivariateExpKernel(Kern):
     def update_gradients_full(self, dL_dK, X, X2):
         if X2 is None: X2 = X
 
-        denom = (X + X2.T + self.bet) ** self.alp
-        d_alp_num = np.log(self.bet) * (self.bet**self.alp) * denom - np.log(np.sum(X,axis=-1) + np.sum(X2.T,axis=-1) + self.bet) * denom * (self.bet**self.alp)
+        K, n_dim = 0., X.shape[1]
+        for dim in range(n_dim):
+            K += X[:,dim].reshape(-1,1) + X2[:,dim].reshape(-1,1).T
+
+        denom = (K + self.bet) ** self.alp
+        d_alp_num = np.log(self.bet) * (self.bet**self.alp) * denom - np.log(K + self.bet) * denom * (self.bet**self.alp)
         d_alp_den = denom ** 2
-        d_bet_num = self.alp * (self.bet**(self.alp-1)) * denom - self.alp * ((np.sum(X,axis=-1) + np.sum(X2.T,axis=-1) + self.bet)**(self.alp-1)) * (self.bet**self.alp)
+        d_bet_num = self.alp * (self.bet**(self.alp-1)) * denom - self.alp * ((K + self.bet)**(self.alp-1)) * (self.bet**self.alp)
         d_bet_den = denom ** 2
 
         self.alp.gradient = np.sum((d_alp_num/d_alp_den) * dL_dK)

@@ -7,6 +7,8 @@ This script contains several objective functions implemented for the BO-BOS algo
 
 from __future__ import print_function
 #import tensorflow
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
 import scipy.io as sio
@@ -55,7 +57,7 @@ def MNIST_plus_train_loss(param, no_stop=False, incumbent=None, bo_iteration=0, 
         N: the maximum number of epochs
         N_init_epochs: the number of initial epochs used in BOS
     '''
-    
+    #action_regions, grid_St = run_BOS_plus(np.array([[0.4],[0.35],[0.25],[0.2],[0.18],[0.16]]), np.array([[1.7],[1.2],[0.9],[0.8],[0.8],[0.8]]), 0.2, 10, 5) # TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     training_epochs = N
     num_init_curve=N_init_epochs
     time_BOS = -1 # the time spent in solving the BOS problem, just for reference    
@@ -112,6 +114,7 @@ def MNIST_plus_train_loss(param, no_stop=False, incumbent=None, bo_iteration=0, 
     train_epochs = []
     val_epochs = []
     time_func_eval = []
+    early_stopped = False
     with tf.Session(config=config) as sess:
         # Run the initializer
         sess.run(init)
@@ -136,11 +139,12 @@ def MNIST_plus_train_loss(param, no_stop=False, incumbent=None, bo_iteration=0, 
 
             # run BOS after observing "num_init_curve" initial number of training epochs
             if (epoch+1 == num_init_curve) and (not no_stop):
+                print("initial training losses: ", np.array(train_epochs))
                 print("initial learning errors: ", 1 - np.array(val_epochs))
                 time_start = time.time()
                 # add BOBOS-PLUS specific info, AKA training loss. Must be a 2D array of shape <num_data x num_features>
-                features = np.array(train_epochs).reshape(-1, 1)
-                action_regions, grid_St = run_BOS_plus(features, 1 - np.array(val_epochs), incumbent, training_epochs, bo_iteration)
+                train_info = np.array(train_epochs).reshape(-1,1)
+                action_regions, grid_St = run_BOS_plus(1-np.array(val_epochs), train_info, incumbent, training_epochs, bo_iteration)
                 time_BOS = time.time() - time_start
 
             # start using the decision rules obtained from BOS
@@ -153,8 +157,13 @@ def MNIST_plus_train_loss(param, no_stop=False, incumbent=None, bo_iteration=0, 
                 if action_to_take == 2:
                     # condition 2: the second criteria used in the BO-BOS algorithm
                     if (kappa * stds[epoch] >= stds[-1]) or (stds == []):
+                        early_stopped = True
                         break
-
+    print("============================================================")
+    print(f"Objective Function Complete:")
+    print(f"- Final Performance: {val_epochs[-1]}")
+    print(f"- Early Stopped: {early_stopped}")
+    print("============================================================")
     return val_epochs[-1], (epoch + 1) / training_epochs, time_BOS, val_epochs, time_func_eval
 
 

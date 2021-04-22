@@ -159,17 +159,17 @@ def run_BOS(init_curve, incumbent, training_epochs, bo_iteration):
     return actions, grid_St
 
 
-def run_BOS_plus(features, init_curve, incumbent, training_epochs, bo_iteration):
+def run_BOS_plus(init_curve, train_info, incumbent, training_epochs, bo_iteration):
     '''
-    features: initial learning curve stats used to generate forward simulations
-              shape: <num iterations vs num stats>
     init_curve: initial learning curve validation loss used to generate forward simulations
                 shape: <num iterations>
+    train_info: initial learning curve stats used to generate forward simulations
+                shape: <num iterations vs num stats>
     incumbent: currently optimal validation error
     training_epochs: the maximum number of epochs to train (N)
     bo_itetation: iteration of BO, starting from 0 (after initialization)
     '''
-    initial_sample_len, num_features = features.shape
+    initial_sample_len, train_info_dim = train_info.shape
     grid_size = 100
     sample_number = 200
 
@@ -177,10 +177,10 @@ def run_BOS_plus(features, init_curve, incumbent, training_epochs, bo_iteration)
     fs_sample_number = 100000
 
     ###### define the cost parameters, including K_2, c, and the K_1 sequence
-#     K1_init, K2, C, gamma = 100, 99, 1, 1.0 # fixed K1
+    # K1_init, K2, C, gamma = 100, 99, 1, 1.0 # fixed K1
     K1_init, K2, C, gamma = 100, 99, 1, 0.99 # small K1
-#     K1_init, K2, C, gamma = 100, 99, 1, 0.95 # normal K1
-#     K1_init, K2, C, gamma = 100, 99, 1, 0.89 # large K1 89
+    # K1_init, K2, C, gamma = 100, 99, 1, 0.95 # normal K1
+    # K1_init, K2, C, gamma = 100, 99, 1, 0.89 # large K1 89
 
     K1 = K1_init / (gamma ** bo_iteration)
 
@@ -189,20 +189,22 @@ def run_BOS_plus(features, init_curve, incumbent, training_epochs, bo_iteration)
 
     ######## Below generates forward simulation samples #########
     # Use the initial samples from a learning curve to initialize the prior distribution
-    timestamps = np.arange(1, initial_sample_len+1).reshape(-1, 1)
-    features = np.append(features, timestamps, axis=1)
-    init_curve = np.array(init_curve).reshape(-1, 1)
-    import pdb; pdb.set_trace()
-    k_exp = GPy.kern.src.MultivariateExpKernel(input_dim=num_features+1)
-    m_gpy = GPy.models.GPRegression(features, init_curve, k_exp)
-    m_gpy.likelihood.variance.fix(1e-3) # fix the noise, to produce more diverse and realistic forward simulation samples
+    learning_curve_x = [np.arange(1, initial_sample_len+1).reshape(-1, 1) for _ in range(train_info_dim+1)]
+    learning_curve_y = [init_curve.reshape(-1,1)] + [train_info[:,d].reshape(-1,1) for d in range(train_info_dim)]
+    # alpha_init, beta_init = initial_sample_len, np.sum(learning_curve_y)
+    k_exp = GPy.kern.src.ExpKernel(input_dim=1, active_dims=[0])
+    icm = GPy.util.multioutput.ICM(input_dim=1,num_outputs=2,kernel=k_exp,W_rank=2)
+    m_gpy = GPy.models.GPCoregionalizedRegression(learning_curve_x,learning_curve_y,kernel=icm)
+    # m_gpy.likelihood.predictive_variance.fix(1e-3) # fix the noise, to produce more diverse and realistic forward simulation samples
+    for likelihood_obj in m_gpy.likelihood.likelihoods_list:
+        likelihood_obj.variance.fix(1e-3)
     m_gpy.optimize(messages=False)
+    # NOTE: To investigate the model: print(m_gpy)
+    # NOTE: To visualize predictions: plot_outputs(m_gpy)
 
-    # TODO: posterior samples need X's that are not just timestamps, but also additional information from BOBOS-PLUS... How to fix?
-    # Solution 1: Also predict future additional information - This would be hard since we need to specify kernel for additional info
-    # Solution 2: Assume the additional information is fixed to the last observed additional information value?
-    xx = np.arange(1, initial_sample_len+T+1).reshape(-1, 1)
-    post_samples = m_gpy.posterior_samples_f(xx, full_cov=True, size=fs_sample_number)
+    # To sample the 0th dim output in GPy ICM, we append a vector of 0s to the columns of the query vector
+    xx = np.stack([np.arange(1, initial_sample_len+T+1), np.zeros(initial_sample_len+T)], axis=1)
+    post_samples = m_gpy.posterior_samples_f(xx, full_cov=True, size=fs_sample_number) # remove full_cov?
     post_samples = np.squeeze(post_samples)
     samples_data = post_samples.T[:, initial_sample_len:]
     print("samples_data: ", samples_data.shape)
@@ -216,7 +218,7 @@ def run_BOS_plus(features, init_curve, incumbent, training_epochs, bo_iteration)
     ######### Below we run backward induction to get Bayes optimal decision ##########
     # calculate St from sample trajectories
     St = []
-    for s in tqdm(samples_data):
+    for s in samples_data:
         St.append(np.cumsum(s) / (np.arange(len(s)) + 1))
     St = np.array(St)
 
@@ -231,7 +233,7 @@ def run_BOS_plus(features, init_curve, incumbent, training_epochs, bo_iteration)
     print("Calculating termination losses...")
 
     all_Pr_z_star = np.zeros((T, grid_size - 1))
-    for step in tqdm((np.arange(T) + 1)):
+    for step in np.arange(T)+1:
         data_t = St[:, step - 1]
         Pr_z_star_samples = np.zeros(grid_size - 1)
         Pr_z_star_accum = np.zeros(grid_size - 1)
@@ -265,7 +267,7 @@ def run_BOS_plus(features, init_curve, incumbent, training_epochs, bo_iteration)
     print("Calculating continuation losses...")
     step = T - 1
     while step > 0:
-        print("Running step {0}".format(step))
+        if step % 10 == 0: print("Running step {0}".format(step))
 
         data_t = St[:, step - 1]
         grid_samples = np.zeros(grid_size - 1)
@@ -314,3 +316,15 @@ def run_BOS_plus(features, init_curve, incumbent, training_epochs, bo_iteration)
 
     # return the obtained decision rules, as well as the space of summary statistics
     return actions, grid_St
+
+
+def plot_outputs(m,xlim=(0,20),ylim=(0,1),output_dim=0):
+    # Use this function to visualize predictions (visualizes output_dim-th output prediction)
+    # m: GPy model
+    fig = plt.figure(figsize=(12,8))
+    ax1 = fig.add_subplot(211)
+    ax1.set_xlim(xlim)
+    ax1.set_title('Output 1')
+    m.plot(plot_limits=xlim,fixed_inputs=[(1,output_dim)],which_data_rows=slice(0,100),ax=ax1)
+    plt.show()
+    plt.close()

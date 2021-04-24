@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import GPy
 from tqdm import tqdm
 
+
 def run_BOS(init_curve, incumbent, training_epochs, bo_iteration):
     '''
     init_curve: initial learning curves used to generate forward simulations
@@ -15,16 +16,16 @@ def run_BOS(init_curve, incumbent, training_epochs, bo_iteration):
     training_epochs: the maximum number of epochs to train (N)
     bo_itetation: iteration of BO, starting from 0 (after initialization)
     '''
-    
+
     grid_size = 100
     sample_number = 200
 
     # this number can be reduced to improve the time efficiency, at the potential expense of less accurate approximation
     fs_sample_number = 100000
 
-    ###### define the cost parameters, including K_2, c, and the K_1 sequence
+    # define the cost parameters, including K_2, c, and the K_1 sequence
 #     K1_init, K2, C, gamma = 100, 99, 1, 1.0 # fixed K1
-    K1_init, K2, C, gamma = 100, 99, 1, 0.99 # small K1
+    K1_init, K2, C, gamma = 100, 99, 1, 0.99  # small K1
 #     K1_init, K2, C, gamma = 100, 99, 1, 0.95 # normal K1
 #     K1_init, K2, C, gamma = 100, 99, 1, 0.89 # large K1 89
 
@@ -41,19 +42,21 @@ def run_BOS(init_curve, incumbent, training_epochs, bo_iteration):
     alpha_init, beta_init = initial_sample_len, np.sum(init_curve)
     k_exp = GPy.kern.src.ExpKernel(input_dim=1, active_dims=[0])
     m_gpy = GPy.models.GPRegression(lc_x, init_curve, k_exp)
-    m_gpy.likelihood.variance.fix(1e-3) # fix the noise, to produce more diverse and realistic forward simulation samples
+    # fix the noise, to produce more diverse and realistic forward simulation samples
+    m_gpy.likelihood.variance.fix(1e-3)
     m_gpy.optimize(messages=False)
 
     xx = np.arange(1, initial_sample_len+T+1).reshape(-1, 1)
-    post_samples = m_gpy.posterior_samples_f(xx, full_cov=True, size=fs_sample_number)
+    post_samples = m_gpy.posterior_samples_f(
+        xx, full_cov=True, size=fs_sample_number)
     post_samples = np.squeeze(post_samples)
     samples_data = post_samples.T[:, initial_sample_len:]
     print("samples_data: ", samples_data.shape)
 
     # remove those sampled curves that exceed the range [0, 1]
-    ind = np.all(samples_data<1, axis=1)
+    ind = np.all(samples_data < 1, axis=1)
     samples_data = samples_data[ind]
-    ind = np.all(samples_data>0, axis=1)
+    ind = np.all(samples_data > 0, axis=1)
     samples_data = samples_data[ind]
 
     ######### Below we run backward induction to get Bayes optimal decision ##########
@@ -118,13 +121,15 @@ def run_BOS(init_curve, incumbent, training_epochs, bo_iteration):
         for i in range(len(data_t)):
             val = data_t[i]
 
-            St_next = St[i, step] # the statistic at the next step
+            St_next = St[i, step]  # the statistic at the next step
             St_next_ind_left = np.max(np.nonzero(St_next > grid_St)[0])
 
             if step == T - 1:
-                loss_continue = np.min(losses[step + 1 - 1, St_next_ind_left, :2])
+                loss_continue = np.min(
+                    losses[step + 1 - 1, St_next_ind_left, :2])
             else:
-                loss_continue = np.min(losses[step + 1 - 1, St_next_ind_left, :])
+                loss_continue = np.min(
+                    losses[step + 1 - 1, St_next_ind_left, :])
 
             ind_left = np.max(np.nonzero(val > grid_St)[0])
             grid_losses_cont[ind_left] += loss_continue
@@ -139,7 +144,7 @@ def run_BOS(init_curve, incumbent, training_epochs, bo_iteration):
                 losses[step - 1, i, 2] = 0
 
         step = step - 1
-    
+
     # Below we extract the Bayes optimal decisions according to the losses calculated above
     # 0: decision d_0
     # 1: decision d_2
@@ -176,9 +181,9 @@ def run_BOS_plus(init_curve, train_info, incumbent, training_epochs, bo_iteratio
     # this number can be reduced to improve the time efficiency, at the potential expense of less accurate approximation
     fs_sample_number = 100000
 
-    ###### define the cost parameters, including K_2, c, and the K_1 sequence
+    # define the cost parameters, including K_2, c, and the K_1 sequence
     # K1_init, K2, C, gamma = 100, 99, 1, 1.0 # fixed K1
-    K1_init, K2, C, gamma = 100, 99, 1, 0.99 # small K1
+    K1_init, K2, C, gamma = 100, 99, 1, 0.99  # small K1
     # K1_init, K2, C, gamma = 100, 99, 1, 0.95 # normal K1
     # K1_init, K2, C, gamma = 100, 99, 1, 0.89 # large K1 89
 
@@ -189,12 +194,16 @@ def run_BOS_plus(init_curve, train_info, incumbent, training_epochs, bo_iteratio
 
     ######## Below generates forward simulation samples #########
     # Use the initial samples from a learning curve to initialize the prior distribution
-    learning_curve_x = [np.arange(1, initial_sample_len+1).reshape(-1, 1) for _ in range(train_info_dim+1)]
-    learning_curve_y = [init_curve.reshape(-1,1)] + [train_info[:,d].reshape(-1,1) for d in range(train_info_dim)]
+    learning_curve_x = [np.arange(
+        1, initial_sample_len+1).reshape(-1, 1) for _ in range(train_info_dim+1)]
+    learning_curve_y = [
+        init_curve.reshape(-1, 1)] + [train_info[:, d].reshape(-1, 1) for d in range(train_info_dim)]
     # alpha_init, beta_init = initial_sample_len, np.sum(learning_curve_y)
     k_exp = GPy.kern.src.ExpKernel(input_dim=1, active_dims=[0])
-    icm = GPy.util.multioutput.ICM(input_dim=1,num_outputs=2,kernel=k_exp,W_rank=2)
-    m_gpy = GPy.models.GPCoregionalizedRegression(learning_curve_x,learning_curve_y,kernel=icm)
+    icm = GPy.util.multioutput.ICM(
+        input_dim=1, num_outputs=2, kernel=k_exp, W_rank=2)
+    m_gpy = GPy.models.GPCoregionalizedRegression(
+        learning_curve_x, learning_curve_y, kernel=icm)
     # m_gpy.likelihood.predictive_variance.fix(1e-3) # fix the noise, to produce more diverse and realistic forward simulation samples
     for likelihood_obj in m_gpy.likelihood.likelihoods_list:
         likelihood_obj.variance.fix(1e-3)
@@ -203,16 +212,18 @@ def run_BOS_plus(init_curve, train_info, incumbent, training_epochs, bo_iteratio
     # NOTE: To visualize predictions: plot_outputs(m_gpy)
 
     # To sample the 0th dim output in GPy ICM, we append a vector of 0s to the columns of the query vector
-    xx = np.stack([np.arange(1, initial_sample_len+T+1), np.zeros(initial_sample_len+T)], axis=1)
-    post_samples = m_gpy.posterior_samples_f(xx, full_cov=True, size=fs_sample_number) # remove full_cov?
+    xx = np.stack([np.arange(1, initial_sample_len+T+1),
+                   np.zeros(initial_sample_len+T)], axis=1)
+    post_samples = m_gpy.posterior_samples_f(
+        xx, full_cov=True, size=fs_sample_number)  # remove full_cov?
     post_samples = np.squeeze(post_samples)
     samples_data = post_samples.T[:, initial_sample_len:]
     print("samples_data: ", samples_data.shape)
 
     # remove those sampled curves that exceed the range [0, 1]
-    ind = np.all(samples_data<1, axis=1)
+    ind = np.all(samples_data < 1, axis=1)
     samples_data = samples_data[ind]
-    ind = np.all(samples_data>0, axis=1)
+    ind = np.all(samples_data > 0, axis=1)
     samples_data = samples_data[ind]
 
     ######### Below we run backward induction to get Bayes optimal decision ##########
@@ -267,7 +278,8 @@ def run_BOS_plus(init_curve, train_info, incumbent, training_epochs, bo_iteratio
     print("Calculating continuation losses...")
     step = T - 1
     while step > 0:
-        if step % 10 == 0: print("Running step {0}".format(step))
+        if step % 10 == 0:
+            print("Running step {0}".format(step))
 
         data_t = St[:, step - 1]
         grid_samples = np.zeros(grid_size - 1)
@@ -277,13 +289,15 @@ def run_BOS_plus(init_curve, train_info, incumbent, training_epochs, bo_iteratio
         for i in range(len(data_t)):
             val = data_t[i]
 
-            St_next = St[i, step] # the statistic at the next step
+            St_next = St[i, step]  # the statistic at the next step
             St_next_ind_left = np.max(np.nonzero(St_next > grid_St)[0])
 
             if step == T - 1:
-                loss_continue = np.min(losses[step + 1 - 1, St_next_ind_left, :2])
+                loss_continue = np.min(
+                    losses[step + 1 - 1, St_next_ind_left, :2])
             else:
-                loss_continue = np.min(losses[step + 1 - 1, St_next_ind_left, :])
+                loss_continue = np.min(
+                    losses[step + 1 - 1, St_next_ind_left, :])
 
             ind_left = np.max(np.nonzero(val > grid_St)[0])
             grid_losses_cont[ind_left] += loss_continue
@@ -318,13 +332,14 @@ def run_BOS_plus(init_curve, train_info, incumbent, training_epochs, bo_iteratio
     return actions, grid_St
 
 
-def plot_outputs(m,xlim=(0,20),ylim=(0,1),output_dim=0):
+def plot_outputs(m, xlim=(0, 20), ylim=(0, 1), output_dim=0):
     # Use this function to visualize predictions (visualizes output_dim-th output prediction)
     # m: GPy model
-    fig = plt.figure(figsize=(12,8))
+    fig = plt.figure(figsize=(12, 8))
     ax1 = fig.add_subplot(211)
     ax1.set_xlim(xlim)
     ax1.set_title('Output 1')
-    m.plot(plot_limits=xlim,fixed_inputs=[(1,output_dim)],which_data_rows=slice(0,100),ax=ax1)
+    m.plot(plot_limits=xlim, fixed_inputs=[
+           (1, output_dim)], which_data_rows=slice(0, 100), ax=ax1)
     plt.show()
     plt.close()

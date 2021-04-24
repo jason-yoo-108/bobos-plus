@@ -2,3 +2,5 @@
 datasets
 !datasets/mnist
 !datasets/svhn
+saved_results
+!saved_results/init.txt

@@ -1,17 +1,33 @@
+import argparse
 import numpy as np
+import os
 
-### import the BO package
+# import the BO package
 from bayesian_optimization import BayesianOptimization
 
-### import the objetive function
-from objective_functions import MNIST_plus_train_loss as objective_function
-#from objective_functions import objective_function_LR_MNIST as objective_function
-# from objective_functions import objective_function_CNN_CIFAR_10 as objective_function
-# from objective_functions import objective_function_CNN_SVHN as objective_function
+# import the objetive function
+from objective_functions import *
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-n', '--name', default='untitled', type=str)
+parser.add_argument('-a', '--alg', default='bobos+', type=str,
+                    choices=['bo', 'bobos', 'bobos+'])
+parser.add_argument('-t', '--task', default='mnist', type=str,
+                    choices=['mnist', 'hopper'])
+parser.add_argument('-r', '--repeats', default=10, type=int)
+args = parser.parse_args()
+
+if args.task == 'mnist':
+    parameter_names = ["batch_size", "C", "learning_rate"]
+    if args.alg == 'bobos+':
+        objective_function = MNIST_plus_train_loss
+    else:
+        objective_function = objective_function_LR_MNIST
+else:
+    raise Exception('Invalid Task')
 
 np.random.seed(0)
-
-iterations_list = np.arange(1, 11)
+iterations_list = np.arange(1, args.repeats+1)
 
 for run_iter in iterations_list:
     '''
@@ -19,22 +35,36 @@ for run_iter in iterations_list:
     In particular, set "no_BOS=True" if we want to run standard GP-UCB, and "no_BOS=False" if we want to run the BO-BOS algorithm;
     When running the "maximize" function, the intermediate results are saved after every BO iteration, under the file name log_file; the content of the log file is explained in the "analyze_results" ipython notebook script.
     '''
-    
-    # run without BOS
-    # BO_no_BOS = BayesianOptimization(f=objective_function,
-    #         dim = 3, gp_opt_schedule=10, \
-    #         no_BOS=True, use_init=None, \
-    #         log_file="saved_results/bos_mnist_no_stop_" + str(run_iter) + ".p", save_init=True, \
-    #         save_init_file="mnist_5_" + str(run_iter) + ".p", \
-    #         parameter_names=["batch_size", "C", "learning_rate"])
-    # # "parameter_names" are dummy variables whose correspondance in the display is not guaranteed
-    # BO_no_BOS.maximize(n_iter=50, init_points=3, kappa=2, use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
-
-    # run with BOS, using the same initializations as above
-    BO_BOS = BayesianOptimization(f=objective_function,
-            dim = 3, gp_opt_schedule=10, no_BOS=False, use_init=None,#use_init="mnist_5_" + str(run_iter) + ".p", \
-            log_file="saved_results/bos_mnist_with_stop_" + str(run_iter) + ".p", save_init=False, \
-            save_init_file=None, \
-            add_interm_fid=[0, 9, 19, 29, 39], parameter_names=["batch_size", "C", "learning_rate"])
-    BO_BOS.maximize(n_iter=70, init_points=3, kappa=2, use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
-
+    log_file_dir = os.path.join("saved_results", args.name)
+    os.makedirs(log_file_dir, exist_ok=True)
+    log_file_path = os.path.join(
+        log_file_dir, f"{args.alg}_{args.task}_{run_iter}.p")
+    if args.alg == 'bo':
+        # run without BOS
+        BO_no_BOS = BayesianOptimization(f=objective_function,
+                                         dim=3, gp_opt_schedule=10,
+                                         no_BOS=True, use_init=None,
+                                         log_file=log_file_path, save_init=False,
+                                         save_init_file=None,
+                                         parameter_names=parameter_names)
+        # "parameter_names" are dummy variables whose correspondance in the display is not guaranteed
+        BO_no_BOS.maximize(n_iter=50, init_points=3, kappa=2,
+                           use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
+    elif args.alg == 'bobos':
+        # run with BOS, using the same initializations as above
+        BO_BOS = BayesianOptimization(f=objective_function,
+                                      dim=3, gp_opt_schedule=10, no_BOS=False, use_init=None,
+                                      log_file=log_file_path, save_init=False,
+                                      save_init_file=None,
+                                      add_interm_fid=[0, 9, 19, 29, 39], parameter_names=parameter_names)
+        BO_BOS.maximize(n_iter=70, init_points=3, kappa=2,
+                        use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
+    elif args.alg == 'bobos+':
+        # run with BOS, using the same initializations as above
+        BO_BOS = BayesianOptimization(f=objective_function,
+                                      dim=3, gp_opt_schedule=10, no_BOS=False, use_init=None,
+                                      log_file=log_file_path, save_init=False,
+                                      save_init_file=None,
+                                      add_interm_fid=[0, 9, 19, 29, 39], parameter_names=parameter_names)
+        BO_BOS.maximize(n_iter=70, init_points=3, kappa=2,
+                        use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')

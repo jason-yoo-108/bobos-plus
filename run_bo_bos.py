@@ -7,6 +7,7 @@ from bayesian_optimization import BayesianOptimization
 
 # import the objetive function
 from objective_functions import *
+from bc_objective_fn import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-n', '--name', default='untitled', type=str)
@@ -23,6 +24,13 @@ if args.task == 'mnist':
         objective_function = MNIST_plus_train_loss
     else:
         objective_function = objective_function_LR_MNIST
+
+elif args.task == 'hopper':
+    parameter_names = ["batch_size", "log_lr", "bandwidth"]
+    if args.alg == 'bobos+':
+        objective_function = objective_function_bc
+    else:
+        raise Exception('Not implemented')
 else:
     raise Exception('Invalid Task')
 
@@ -61,10 +69,20 @@ for run_iter in iterations_list:
                         use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
     elif args.alg == 'bobos+':
         # run with BOS, using the same initializations as above
-        BO_BOS = BayesianOptimization(f=objective_function,
-                                      dim=3, gp_opt_schedule=10, no_BOS=False, use_init=None,
-                                      log_file=log_file_path, save_init=False,
-                                      save_init_file=None,
-                                      add_interm_fid=[0, 9, 19, 29, 39], parameter_names=parameter_names)
-        BO_BOS.maximize(n_iter=70, init_points=3, kappa=2,
-                        use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
+        if args.task == 'hopper':
+            BO_BOS = BayesianOptimization(f=objective_function,
+                                        dim=3, gp_opt_schedule=10, no_BOS=False, use_init=None,
+                                        log_file=log_file_path, save_init=False,
+                                        save_init_file=None,
+                                        add_interm_fid=[0, 9, 19, 29, 39], parameter_names=parameter_names, N=1000, N_init_epochs=80)
+            BO_BOS.maximize(n_iter=70, init_points=3, kappa=2,
+                            use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
+
+        else:
+            BO_BOS = BayesianOptimization(f=objective_function,
+                                        dim=3, gp_opt_schedule=10, no_BOS=False, use_init=None,
+                                        log_file=log_file_path, save_init=False,
+                                        save_init_file=None,
+                                        add_interm_fid=[0, 9, 19, 29, 39], parameter_names=parameter_names)
+            BO_BOS.maximize(n_iter=70, init_points=3, kappa=2,
+                            use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')

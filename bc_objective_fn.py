@@ -373,94 +373,92 @@ def objective_function_bc(param, no_stop=False, incumbent=None, bo_iteration=0, 
     avg_loss = 0
     policy_loss = 0.
     accumulated_avg_loss = 0.
+    early_stopped = False
+
+
+
     for epoch in tqdm(range(training_epochs)):
 
-        # Update parameters of all the networks
         iter_start=time.time()
-        for _ in range(args.policy_updates):
-            policy_loss = agent.update_parameters(memory, args.batch_size, updates)
-            updates += 1
-        if args.policy_updates == 0:
-            updates += 1
-        # log / print
-        avg_loss = ((updates-1)/updates) * avg_loss + (1/updates)*policy_loss
-        # wandb.log({'loss_policy': policy_loss, 'log_loss_policy': np.log(policy_loss),
-        #             'step_size': agent.policy_optim.state['step_size'],
-        #             'avg_loss': avg_loss, 'avg_log_loss': np.log(avg_loss)}, step=updates)
-        
-        accumulated_avg_loss  += avg_loss
-
-
-        # get the evaluated results
-        # eval / save
-        if (epoch % 10 == 0) and args.eval:
-            # training
-            accumulated_avg_loss /= 1000.
-            train_epochs.append(accumulated_avg_loss)
-            accumulated_avg_loss = 0.0
-            # evaluation
-            avg_reward = 0.
-            episodes = 10
-            for _  in range(episodes):
-                state = env.reset()
-                episode_reward = 0
-                done = False
-                while not done:
-                    action, _ = agent.select_action(state, evaluate=True)
-                    next_state, reward, done, _ = env.step(action)
-                    episode_reward += reward
-                    state = next_state
-                avg_reward += episode_reward
-            avg_reward /= episodes
-            ## need to clip this awards TODO
-            max_rewards = exp_reward/4 
-            min_rewards = -10. # TBD
+        accumulated_avg_loss = 0.
+        for inner_ep in range(10):
             
-            if avg_reward > max_rewards:
-                avg_reward = 1.
-            if avg_reward < min_rewards:
-                avg_reward = 0.0000001
-            normalized_avg_reward = map(avg_reward, min_rewards, max_rewards, 0., 1.)
+            for _ in range(args.policy_updates):
+                policy_loss = agent.update_parameters(memory, args.batch_size, updates)
+                updates += 1
+            if args.policy_updates == 0:
+                updates += 1
+            # log / print
+            avg_loss = ((updates-1)/updates) * avg_loss + (1/updates)*policy_loss
+            # wandb.log({'loss_policy': policy_loss, 'log_loss_policy': np.log(policy_loss),
+            #             'step_size': agent.policy_optim.state['step_size'],
+            #             'avg_loss': avg_loss, 'avg_log_loss': np.log(avg_loss)}, step=updates)
+            
+            accumulated_avg_loss  += avg_loss
 
-            val_epochs.append(normalized_avg_reward)
-            time_func_eval.append(time.time())
-            print("----------------------------------------")
-            print("Test Episodes: {}, Avg. Reward: {}".format(episodes, round(normalized_avg_reward, 2)))
-            print("Updates: {}, Avg. Loss: {}".format(updates, round(avg_loss, 4)))
-            print("Time-elapsed: {}, Avg. Log Loss: {}".format(timer(start,time.time()), round(np.log(policy_loss), 4)))
-            print("Iteration-time: {}, Step-size: {}".format(timer(iter_start,time.time()), agent.policy_optim.state['step_size']))
-            print("----------------------------------------")
-
-            # if len(memory) > args.batch_size:
-            #     wandb.log({'det_avg_reward': round(normalized_avg_reward, 2),'exp_reward':exp_reward}, step=updates)
-
+        accumulated_avg_loss /= 10.
+        train_epochs.append(accumulated_avg_loss)
+            
+        avg_reward = 0.
+        episodes = 20
+        for _  in range(episodes):
+            state = env.reset()
+            episode_reward = 0
+            done = False
+            while not done:
+                action, _ = agent.select_action(state, evaluate=True)
+                next_state, reward, done, _ = env.step(action)
+                episode_reward += reward
+                state = next_state
+            avg_reward += episode_reward
+        avg_reward /= episodes
+        ## need to clip this awards TODO
+        max_rewards = exp_reward/4 
+        min_rewards = -10. # TBD
         
-            # run BOS after observing "num_init_curve" initial number of training epochs
-            if (epoch == num_init_curve) and (not no_stop):
-                print("initial learning errors: ", 1 - np.array(val_epochs))
-                time_start = time.time()
-                # add BOBOS-PLUS specific info, AKA training loss. Must be a 2D array of shape <num_data x num_features>
-                train_info = np.array(train_epochs).reshape(-1,1)
-                action_regions, grid_St = run_BOS_plus(1 - np.array(val_epochs), train_info,incumbent, training_epochs, bo_iteration)
-                time_BOS = time.time() - time_start
+        if avg_reward > max_rewards:
+            avg_reward = 1.
+        if avg_reward < min_rewards:
+            avg_reward = 0.0000001
+        normalized_avg_reward = map(avg_reward, min_rewards, max_rewards, 0., 1.)
+        val_epochs.append(normalized_avg_reward)
+        time_func_eval.append(time.time())
+        print("----------------------------------------")
+        print("Test Episodes: {}, Avg. Reward: {}".format(episodes, round(normalized_avg_reward, 2)))
+        print("Updates: {}, Avg. Loss: {}".format(updates, round(avg_loss, 4)))
+        print("Time-elapsed: {}, Avg. Log Loss: {}".format(timer(start,time.time()), round(np.log(policy_loss), 4)))
+        print("Iteration-time: {}, Step-size: {}".format(timer(iter_start,time.time()), agent.policy_optim.state['step_size']))
+        print("----------------------------------------")
 
-            # start using the decision rules obtained from BOS
-            if (epoch >= num_init_curve) and (not no_stop):
-                state = np.sum(1 - np.array(val_epochs[num_init_curve:])) / (epoch - num_init_curve)
-                ind_state = np.max(np.nonzero(state > grid_St)[0])
-                action_to_take = action_regions[epoch - num_init_curve, ind_state]
-                    
-                # condition 1: if action_to_take == 2, then the optimal decision is to stop the current training
-                if action_to_take == 2:
-                    # condition 2: the second criteria used in the BO-BOS algorithm
-                    if (kappa * stds[epoch] >= stds[-1]) or (stds == []):
-                        break
-    print("============================================================")
-    print(f"Objective Function Complete:")
-    print(f"- Final Performance: {val_epochs[-1]}")
-    print(f"- Early Stopped: {early_stopped}")
-    print("============================================================")            
-    return val_epochs[-1], (epoch) / training_epochs, time_BOS, val_epochs, time_func_eval
+        # run BOS after observing "num_init_curve" initial number of training epochs
+        if (epoch+1 == num_init_curve) and (not no_stop):
+            print("initial training losses: ", np.array(train_epochs))
+            print("initial learning errors: ", 1 - np.array(val_epochs))
+            time_start = time.time()
+            # add BOBOS-PLUS specific info, AKA training loss. Must be a 2D array of shape <num_data x num_features>
+            train_info = np.array(train_epochs).reshape(-1,1)
+            action_regions, grid_St = run_BOS_plus(1 - np.array(val_epochs), train_info,incumbent, training_epochs, bo_iteration)
+                
+            time_BOS = time.time() - time_start
+            
+        if (epoch >= num_init_curve) and (not no_stop):
+            state = np.sum(1 - np.array(val_epochs[num_init_curve:])) / (epoch - num_init_curve + 1)
+            ind_state = np.max(np.nonzero(state > grid_St)[0])
+            action_to_take = action_regions[epoch - num_init_curve, ind_state]
+                
+            # condition 1: if action_to_take == 2, then the optimal decision is to stop the current training
+            if action_to_take == 2:
+            # condition 2: the second criteria used in the BO-BOS algorithm
+                if (kappa * stds[epoch] >= stds[-1]) or (stds == []):
+                    early_stopped = True
+                    break
+        print("============================================================")
+        print(f"Objective Function Complete:")
+        print(f"- Final Performance: {val_epochs[-1]}")
+        print(f"- Early Stopped: {early_stopped}")
+        print("============================================================")            
+    return val_epochs[-1], (epoch+1) / training_epochs, time_BOS, val_epochs, time_func_eval
+
 
 
 

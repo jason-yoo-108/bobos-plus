@@ -74,7 +74,7 @@ for run_iter in iterations_list:
                                         dim=3, gp_opt_schedule=10, no_BOS=False, use_init=None,
                                         log_file=log_file_path, save_init=False,
                                         save_init_file=None,
-                                        add_interm_fid=[0, 9, 19, 29, 39], parameter_names=parameter_names, N=1000, N_init_epochs=80)
+                                        add_interm_fid=[0, 9, 19, 29, 39], parameter_names=parameter_names, N=50, N_init_epochs=8)
             BO_BOS.maximize(n_iter=70, init_points=3, kappa=2,
                             use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
 

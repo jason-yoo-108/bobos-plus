@@ -30,7 +30,7 @@ elif args.task == 'hopper':
     if args.alg == 'bobos+':
         objective_function = objective_function_bc
     else:
-        raise Exception('Not implemented')
+        objective_function = objective_function_bc_org
 else:
     raise Exception('Invalid Task')
 

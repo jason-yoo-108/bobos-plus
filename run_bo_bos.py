@@ -22,6 +22,8 @@ if args.task == 'mnist':
     max_epoch = 50
     bos_epoch = 8
     interm_fid = [0, 9, 19, 29, 39]
+    n_iter_bo = 50
+    n_iter_bobos = 70
     if args.alg == 'bobos+':
         objective_function = MNIST_plus_train_loss
     else:
@@ -30,6 +32,8 @@ elif args.task == 'cifar':
     max_epoch = 25
     bos_epoch = 8
     interm_fid = [0, 9, 19]
+    n_iter_bo = 30
+    n_iter_bobos = 42
     parameter_names = ["batch_size", "lr", "lr_decay",
                        "l2", "conv_filters", "dense_unit"]
     if args.alg == 'bobos+':
@@ -61,7 +65,7 @@ for run_iter in iterations_list:
                                          save_init_file=None, N=max_epoch, N_init_epochs=bos_epoch,
                                          parameter_names=parameter_names)
         # "parameter_names" are dummy variables whose correspondance in the display is not guaranteed
-        BO_no_BOS.maximize(n_iter=50, init_points=len(parameter_names), kappa=2,
+        BO_no_BOS.maximize(n_iter=n_iter_bo, init_points=len(parameter_names), kappa=2,
                            use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
     elif args.alg == 'bobos':
         # run with BOS, using the same initializations as above
@@ -70,7 +74,7 @@ for run_iter in iterations_list:
                                       log_file=log_file_path, save_init=False,
                                       save_init_file=None, N=max_epoch, N_init_epochs=bos_epoch,
                                       add_interm_fid=interm_fid, parameter_names=parameter_names)
-        BO_BOS.maximize(n_iter=70, init_points=len(parameter_names), kappa=2,
+        BO_BOS.maximize(n_iter=n_iter_bobos, init_points=len(parameter_names), kappa=2,
                         use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
     elif args.alg == 'bobos+':
         # run with BOS, using the same initializations as above
@@ -79,5 +83,5 @@ for run_iter in iterations_list:
                                       log_file=log_file_path, save_init=False,
                                       save_init_file=None, N=max_epoch, N_init_epochs=bos_epoch,
                                       add_interm_fid=interm_fid, parameter_names=parameter_names)
-        BO_BOS.maximize(n_iter=70, init_points=len(parameter_names), kappa=2,
+        BO_BOS.maximize(n_iter=n_iter_bobos, init_points=len(parameter_names), kappa=2,
                         use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')

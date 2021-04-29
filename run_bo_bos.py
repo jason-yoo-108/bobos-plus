@@ -13,16 +13,29 @@ parser.add_argument('-n', '--name', default='untitled', type=str)
 parser.add_argument('-a', '--alg', default='bobos+', type=str,
                     choices=['bo', 'bobos', 'bobos+'])
 parser.add_argument('-t', '--task', default='mnist', type=str,
-                    choices=['mnist', 'hopper'])
+                    choices=['mnist', 'cifar', 'hopper'])
 parser.add_argument('-r', '--repeats', default=10, type=int)
 args = parser.parse_args()
 
 if args.task == 'mnist':
     parameter_names = ["batch_size", "C", "learning_rate"]
+    max_epoch = 50
+    bos_epoch = 8
+    interm_fid = [0, 9, 19, 29, 39]
     if args.alg == 'bobos+':
         objective_function = MNIST_plus_train_loss
     else:
         objective_function = objective_function_LR_MNIST
+elif args.task == 'cifar':
+    max_epoch = 25
+    bos_epoch = 8
+    interm_fid = [0, 9, 19]
+    parameter_names = ["batch_size", "lr", "lr_decay",
+                       "l2", "conv_filters", "dense_unit"]
+    if args.alg == 'bobos+':
+        objective_function = CIFAR_10_plus_train_loss
+    else:
+        objective_function = objective_function_CNN_CIFAR_10
 else:
     raise Exception('Invalid Task')
 
@@ -42,29 +55,29 @@ for run_iter in iterations_list:
     if args.alg == 'bo':
         # run without BOS
         BO_no_BOS = BayesianOptimization(f=objective_function,
-                                         dim=3, gp_opt_schedule=10,
+                                         dim=len(parameter_names), gp_opt_schedule=10,
                                          no_BOS=True, use_init=None,
                                          log_file=log_file_path, save_init=False,
-                                         save_init_file=None,
+                                         save_init_file=None, N=max_epoch, N_init_epochs=bos_epoch,
                                          parameter_names=parameter_names)
         # "parameter_names" are dummy variables whose correspondance in the display is not guaranteed
-        BO_no_BOS.maximize(n_iter=50, init_points=3, kappa=2,
+        BO_no_BOS.maximize(n_iter=50, init_points=len(parameter_names), kappa=2,
                            use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
     elif args.alg == 'bobos':
         # run with BOS, using the same initializations as above
         BO_BOS = BayesianOptimization(f=objective_function,
-                                      dim=3, gp_opt_schedule=10, no_BOS=False, use_init=None,
+                                      dim=len(parameter_names), gp_opt_schedule=10, no_BOS=False, use_init=None,
                                       log_file=log_file_path, save_init=False,
-                                      save_init_file=None,
-                                      add_interm_fid=[0, 9, 19, 29, 39], parameter_names=parameter_names)
-        BO_BOS.maximize(n_iter=70, init_points=3, kappa=2,
+                                      save_init_file=None, N=max_epoch, N_init_epochs=bos_epoch,
+                                      add_interm_fid=interm_fid, parameter_names=parameter_names)
+        BO_BOS.maximize(n_iter=70, init_points=len(parameter_names), kappa=2,
                         use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
     elif args.alg == 'bobos+':
         # run with BOS, using the same initializations as above
         BO_BOS = BayesianOptimization(f=objective_function,
-                                      dim=3, gp_opt_schedule=10, no_BOS=False, use_init=None,
+                                      dim=len(parameter_names), gp_opt_schedule=10, no_BOS=False, use_init=None,
                                       log_file=log_file_path, save_init=False,
-                                      save_init_file=None,
-                                      add_interm_fid=[0, 9, 19, 29, 39], parameter_names=parameter_names)
-        BO_BOS.maximize(n_iter=70, init_points=3, kappa=2,
+                                      save_init_file=None, N=max_epoch, N_init_epochs=bos_epoch,
+                                      add_interm_fid=interm_fid, parameter_names=parameter_names)
+        BO_BOS.maximize(n_iter=70, init_points=len(parameter_names), kappa=2,
                         use_fixed_kappa=False, kappa_scale=0.2, acq='ucb')
